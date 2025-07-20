@@ -12,7 +12,7 @@ const mockLiff = {
 };
 
 // Centralized function to send tracking events
-const trackEvent = async (eventName, lineProfile) => {
+const trackEvent = (eventName, lineProfile) => {
   const eventData = {
     eventName: eventName,
     eventTimestamp: new Date().toISOString(),
@@ -21,19 +21,26 @@ const trackEvent = async (eventName, lineProfile) => {
     prop3: lineProfile?.userId || 'Unknown',      // LINE MID
   };
 
-  console.log('Tracking Event:', eventData); // For debugging in the console
+  console.log('Attempting to send tracking event:', eventData);
 
-  try {
-    await fetch('https://icecdp.onrender.com/events', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(eventData),
-    });
-  } catch (error) {
-    console.error('Failed to track event:', error);
-  }
+  fetch('https://icecdp.onrender.com/events', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(eventData),
+  })
+  .then(response => {
+    if (!response.ok) {
+      // Log the error if the server response is not OK
+      response.text().then(text => {
+          console.error(`Failed to track event. Status: ${response.status}`, text);
+      });
+    } else {
+      console.log('Tracking event sent successfully.');
+    }
+  })
+  .catch(error => {
+    console.error('Error sending tracking event:', error);
+  });
 };
 
 // Custom hook for tracking component interactions
@@ -44,10 +51,10 @@ const useInteractionTracking = (screenName, lineProfile) => {
     const mainRef = useRef(null);
 
     useEffect(() => {
-        // Track page view when component mounts
-        if (lineProfile) {
-            trackEvent(`view_${screenName}`, lineProfile);
-        }
+        // Only track if a screenName is provided
+        if (!screenName || !lineProfile) return;
+
+        trackEvent(`view_${screenName}`, lineProfile);
 
         const handleScroll = () => {
              if (mainRef.current && !hasTrackedScroll.current) {
@@ -56,7 +63,7 @@ const useInteractionTracking = (screenName, lineProfile) => {
                 const scrollPercent = (scrollTop / (scrollHeight - clientHeight)) * 100;
                 if (scrollPercent > 70) {
                     trackEvent(`scroll_depth_over_70%_on_${screenName}`, lineProfile);
-                    hasTrackedScroll.current = true; // Track only once per component mount
+                    hasTrackedScroll.current = true;
                 }
             }
         };
@@ -66,7 +73,6 @@ const useInteractionTracking = (screenName, lineProfile) => {
             currentRef.addEventListener('scroll', handleScroll);
         }
 
-        // Track view duration on unmount
         return () => {
             if (currentRef) {
                 currentRef.removeEventListener('scroll', handleScroll);
@@ -315,8 +321,15 @@ const MyPoliciesScreen = ({ setScreen, setSelectedPolicy, lineProfile }) => {
 };
 
 const PolicyDetailsScreen = ({ setScreen, policy, lineProfile }) => {
-    if (!policy) return null; // FIX: Add guard clause to prevent rendering with undefined prop
-    const mainRef = useInteractionTracking(`policy_details_${policy.id}`, lineProfile);
+    // Call hook at the top level, conditionally providing the screen name
+    const screenName = policy ? `policy_details_${policy.id}` : null;
+    const mainRef = useInteractionTracking(screenName, lineProfile);
+
+    // Render nothing if the policy data isn't ready
+    if (!policy) {
+        return null; 
+    }
+    
     return (
         <Card ref={mainRef}>
             <h2 className="text-xl font-semibold text-center text-gray-800 mb-2">{policy.name}</h2>
@@ -345,8 +358,15 @@ const MyClaimsScreen = ({ setScreen, setSelectedClaim, lineProfile }) => {
 };
 
 const ClaimDetailsScreen = ({ setScreen, claim, lineProfile }) => {
-    if (!claim) return null; // FIX: Add guard clause to prevent rendering with undefined prop
-    const mainRef = useInteractionTracking(`claim_details_${claim.id}`, lineProfile);
+    // Call hook at the top level, conditionally providing the screen name
+    const screenName = claim ? `claim_details_${claim.id}` : null;
+    const mainRef = useInteractionTracking(screenName, lineProfile);
+
+    // Render nothing if the claim data isn't ready
+    if (!claim) {
+        return null;
+    }
+
     return (
         <Card ref={mainRef}>
             <h2 className="text-xl font-semibold text-center text-gray-800 mb-6">Claim Details</h2>
