@@ -30,7 +30,6 @@ const trackEvent = (eventName, lineProfile) => {
   })
   .then(response => {
     if (!response.ok) {
-      // Log the error if the server response is not OK
       response.text().then(text => {
           console.error(`Failed to track event. Status: ${response.status}`, text);
       });
@@ -51,7 +50,6 @@ const useInteractionTracking = (screenName, lineProfile) => {
     const mainRef = useRef(null);
 
     useEffect(() => {
-        // Only track if a screenName is provided
         if (!screenName || !lineProfile) return;
 
         trackEvent(`view_${screenName}`, lineProfile);
@@ -59,7 +57,7 @@ const useInteractionTracking = (screenName, lineProfile) => {
         const handleScroll = () => {
              if (mainRef.current && !hasTrackedScroll.current) {
                 const { scrollTop, scrollHeight, clientHeight } = mainRef.current;
-                if (scrollHeight <= clientHeight) return; // No scrollbar
+                if (scrollHeight <= clientHeight) return;
                 const scrollPercent = (scrollTop / (scrollHeight - clientHeight)) * 100;
                 if (scrollPercent > 70) {
                     trackEvent(`scroll_depth_over_70%_on_${screenName}`, lineProfile);
@@ -321,13 +319,11 @@ const MyPoliciesScreen = ({ setScreen, setSelectedPolicy, lineProfile }) => {
 };
 
 const PolicyDetailsScreen = ({ setScreen, policy, lineProfile }) => {
-    // Call hook at the top level, conditionally providing the screen name
     const screenName = policy ? `policy_details_${policy.id}` : null;
     const mainRef = useInteractionTracking(screenName, lineProfile);
 
-    // Render nothing if the policy data isn't ready
     if (!policy) {
-        return null; 
+        return <Card><p>Loading policy details...</p></Card>; 
     }
     
     return (
@@ -358,13 +354,11 @@ const MyClaimsScreen = ({ setScreen, setSelectedClaim, lineProfile }) => {
 };
 
 const ClaimDetailsScreen = ({ setScreen, claim, lineProfile }) => {
-    // Call hook at the top level, conditionally providing the screen name
     const screenName = claim ? `claim_details_${claim.id}` : null;
     const mainRef = useInteractionTracking(screenName, lineProfile);
 
-    // Render nothing if the claim data isn't ready
     if (!claim) {
-        return null;
+        return <Card><p>Loading claim details...</p></Card>;
     }
 
     return (
@@ -403,51 +397,55 @@ export default function App() {
     const [selectedClaim, setSelectedClaim] = useState(null);
 
     useEffect(() => {
-        // Fetch mock LINE profile when the app loads
         mockLiff.getProfile()
             .then(profile => setLineProfile(profile))
             .catch(err => console.error(err));
         
-        // Handle deep linking via URL hash
-        const hash = window.location.hash;
-        if (hash) {
-            switch (hash) {
-                case '#policies':
-                    // Assume user is existing if deep linking to policies
-                    setUserData({ isNew: false });
-                    setScreen('my_policies');
-                    break;
-                case '#claims':
-                    // Assume user is existing if deep linking to claims
-                    setUserData({ isNew: false });
-                    setScreen('my_claims');
-                    break;
-                case '#privileges':
-                    setScreen('privileges');
-                    break;
-                default:
-                    // If hash is unknown, default to welcome screen
-                    setScreen('welcome');
+        const handleHashChange = () => {
+            const hash = window.location.hash;
+            if (hash) {
+                switch (hash) {
+                    case '#policies':
+                        setUserData(prev => ({ ...prev, isNew: false }));
+                        setScreen('my_policies');
+                        break;
+                    case '#claims':
+                        setUserData(prev => ({ ...prev, isNew: false }));
+                        setScreen('my_claims');
+                        break;
+                    case '#privileges':
+                        setScreen('privileges');
+                        break;
+                    default:
+                        setScreen('welcome');
+                }
             }
-        }
+        };
+
+        // Handle initial load and subsequent hash changes
+        handleHashChange();
+        window.addEventListener('hashchange', handleHashChange);
+
+        return () => {
+            window.removeEventListener('hashchange', handleHashChange);
+        };
     }, []);
 
     const renderScreen = () => {
-        const props = { setScreen, setUserData, lineProfile, userData, setSelectedPolicy, selectedPolicy, setSelectedClaim, selectedClaim };
         switch (screen) {
-            case 'existing_customer_login': return <ExistingCustomerLogin {...props} />;
-            case 'new_customer_form': return <NewCustomerForm {...props} />;
-            case 'otp': return <OtpScreen {...props} />;
-            case 'completed': return <CompletedScreen {...props} />;
-            case 'features_menu': return <FeaturesMenuScreen {...props} />;
-            case 'my_policies': return <MyPoliciesScreen {...props} />;
-            case 'policy_details': return <PolicyDetailsScreen {...props} />;
-            case 'my_claims': return <MyClaimsScreen {...props} />;
-            case 'claim_details': return <ClaimDetailsScreen {...props} />;
-            case 'privileges': return <PrivilegesScreen {...props} />;
+            case 'existing_customer_login': return <ExistingCustomerLogin setScreen={setScreen} setUserData={setUserData} lineProfile={lineProfile} />;
+            case 'new_customer_form': return <NewCustomerForm setScreen={setScreen} setUserData={setUserData} lineProfile={lineProfile} />;
+            case 'otp': return <OtpScreen setScreen={setScreen} lineProfile={lineProfile} />;
+            case 'completed': return <CompletedScreen setScreen={setScreen} userData={userData} lineProfile={lineProfile} />;
+            case 'features_menu': return <FeaturesMenuScreen setScreen={setScreen} userData={userData} lineProfile={lineProfile} />;
+            case 'my_policies': return <MyPoliciesScreen setScreen={setScreen} setSelectedPolicy={setSelectedPolicy} lineProfile={lineProfile} />;
+            case 'policy_details': return <PolicyDetailsScreen setScreen={setScreen} policy={selectedPolicy} lineProfile={lineProfile} />;
+            case 'my_claims': return <MyClaimsScreen setScreen={setScreen} setSelectedClaim={setSelectedClaim} lineProfile={lineProfile} />;
+            case 'claim_details': return <ClaimDetailsScreen setScreen={setScreen} claim={selectedClaim} lineProfile={lineProfile} />;
+            case 'privileges': return <PrivilegesScreen setScreen={setScreen} lineProfile={lineProfile} />;
             case 'welcome':
             default:
-                return <WelcomeScreen {...props} />;
+                return <WelcomeScreen setScreen={setScreen} setUserData={setUserData} lineProfile={lineProfile} />;
         }
     };
 
